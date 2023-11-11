@@ -1,9 +1,7 @@
-﻿using CrudWebApiAspCore.Models;
+﻿using AutoMapper;
+using CrudWebApiAspCore.Models;
 using CrudWebApiAspCore.Service;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CrudWebApiAspCore.Controllers
 {
@@ -11,49 +9,59 @@ namespace CrudWebApiAspCore.Controllers
     public class FilmesController : Controller
     {
         private readonly IFilmeService service;
-        
-        public FilmesController(IFilmeService service)
+        private readonly IMapper  _mapper;
+
+        public FilmesController(IFilmeService service, IMapper mapper)
         {
             this.service = service;
+            this._mapper = mapper;
         }
         
         [HttpGet]
         public IActionResult Get()
         {
-            var model = service.GetFilmes();
-            var outputModel = ToOutputModel(model);
-            return Ok(outputModel);
+            var result = service.GetFilmes();
+            var resultDto  = _mapper.Map<List<FilmeDto>>(result); 
+            return Ok(resultDto);
         }
 
         [HttpGet("{id}", Name = "GetFilme")]
         public IActionResult Get(int id)
         {
-            var model = service.GetFilme(id);
-            if (model == null)
+            var result = service.GetFilme(id);
+
+            if (result is null)
                 return NotFound();
-            var outputModel = ToOutputModel(model);
-            return Ok(outputModel);
+            
+            var resultMap = _mapper.Map<FilmeDto>(result);
+            
+            return Ok(resultMap);
         }
         
         [HttpPost]
-        public IActionResult Create([FromBody] FilmeInputModel inputModel)
+        public IActionResult Create([FromBody] FilmeDto inputModel)
         {
             if (inputModel == null)
                 return BadRequest();
-            var model = ToDomainModel(inputModel);
+            
+            var model = this._mapper.Map<Filme>(inputModel);
             service.AddFilme(model);
-            var outputModel = ToOutputModel(model);
+
+            var outputModel = _mapper.Map<FilmeDto>(model);
             return CreatedAtRoute("GetFilme", new { id = outputModel.Id }, outputModel);
         }
         
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] FilmeInputModel inputModel)
+        public IActionResult Update(int id, [FromBody] FilmeDto inputModel)
         {
             if (inputModel == null || id != inputModel.Id)
                 return BadRequest();
+
             if (!service.FilmeExists(id))
                 return NotFound();
-            var model = ToDomainModel(inputModel);
+            
+            var model = _mapper.Map<Filme>(inputModel);
+
             service.UpdateFilme(model);
             return NoContent();
         }
@@ -62,45 +70,9 @@ namespace CrudWebApiAspCore.Controllers
         {
             if (!service.FilmeExists(id))
                 return NotFound();
+
             service.DeleteFilme(id);
-            return NoContent();
-        }
-        //--------------------------------------------------
-        //Mapeamentos : modelos envia/recebe dados via API
-        private FilmeOutputModel ToOutputModel(Filme model)
-        {
-            return new FilmeOutputModel
-            {
-                Id = model.Id,
-                Titulo = model.Titulo,
-                AnoLancamento = model.AnoLancamento.ToString(),
-                Resumo = model.Resumo,
-                UltimoAcesso = DateTime.Now
-            };
-        }
-        private List<FilmeOutputModel> ToOutputModel(List<Filme> model)
-        {
-            return model.Select(item => ToOutputModel(item)).ToList();
-        }
-        private Filme ToDomainModel(FilmeInputModel inputModel)
-        {
-            return new Filme
-            {
-                Id = inputModel.Id,
-                Titulo = inputModel.Titulo,
-                AnoLancamento = int.Parse(inputModel.AnoLancamento),
-                Resumo = inputModel.Resumo
-            };
-        }
-        private FilmeInputModel ToInputModel(Filme model)
-        {
-            return new FilmeInputModel
-            {
-                Id = model.Id,
-                Titulo = model.Titulo,
-                AnoLancamento = model.AnoLancamento.ToString(),
-                Resumo = model.Resumo
-            };
+            return Ok();
         }
     }
 }
